@@ -1,0 +1,53 @@
+classdef Stamina%固定支持面类
+    properties
+        f        %支持面形状函数句柄
+        T        %弹性系数
+        miu      %动摩擦因数
+        Subject  %可能受到支持力的对象集合
+    end
+    methods
+        function NEW=Stamina(f,T,miu,Subject)
+            if nargin==1
+                NEW.f=f;
+                NEW.T=1;
+                NEW.miu=0;
+            elseif nargin==2
+                NEW.f=f;
+                NEW.T=T;
+                NEW.miu=0;
+            elseif nargin==3
+                NEW.f=f;
+                NEW.T=T;
+                NEW.miu=miu;
+            else
+                NEW.f=f;
+                NEW.T=T;
+                NEW.miu=miu;
+                NEW.Subject=Subject;
+            end
+        end
+        function plot(I,X)
+            hold on
+            x=X(1):0.02:X(2);
+            plot(x,I.f(x))
+        end
+        function I=Changemove(I)
+            persistent a
+            if isempty(a)
+                a=I.f(I.Subject.x)>=I.Subject.y;
+            elseif a~=I.f(I.Subject.x)>=I.Subject.y
+                for i=1:length(I.Subject)           %遍历对象
+                if I.f(I.Subject.x)>=I.Subject.y     %面>y
+                        fx=(I.f(I.Subject.x+0.00001)-I.f(I.Subject.x-0.00001))/0.00002;%导函数
+                        fn=sqrt(1+fx^2);
+                        n=[-fx/fn,1/fn];          %法向量
+                        I.Subject.vx=I.Subject.vx-(t+1)*(n(1)*(I.Subject.vx*n(1)+I.Subject.vy*n(2)));
+                        I.Subject.vy=I.Subject.vy-(t+1)*(n(2)*(I.Subject.vx*n(1)+I.Subject.vy*n(2)));
+                    end
+                end
+            end
+            
+            a=I.f(I.Subject.x)>=I.Subject.y;
+        end
+    end
+end
