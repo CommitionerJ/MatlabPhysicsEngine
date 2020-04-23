@@ -51,14 +51,33 @@ classdef Particle
             
             function dy=CreatA(Y)               %构造加速度
                 
-                if 1%abs(I.STA.f(Y(1))-Y(2))<0.00001
+                temph=-I.STA.f(Y(1))+Y(2);
+                Fx=(I.STA.f(Y(1)+0.0001)-I.STA.f(Y(1)-0.0001))/0.0002;
+                Fn=sqrt(1+Fx^2);
+                VN=-Y(3)*Fx/Fn+Y(4)/Fn;
+                
+                if  abs(temph)<0.001&&VN<0.05||I.flag==1&&VN<0.05%支持条件
+                    I.vy=I.vx*Fx;%消除径向速度
+                    I.y=I.STA.f(Y(1));%消除径向位移
+                    Y(4)=I.vy;
+                    if abs(I.vx)<0.00001&&I.STA.miu>abs(Fx)
+                        dy=[0,0,0,0];
+                        return;
+                    end
+                        
+                    f2=(I.STA.f(Y(1)+0.0001)+I.STA.f(Y(1)-0.0001)-2*I.STA.f(Y(1)))/0.0001^2;
+                    Fr=f2*(Y(3)^2+Y(4)^2)/Fn^3;
+                    FNM=max(10/Fn+Fr,0);
+                    FN=FNM*[-Fx/Fn,1/Fn];
                     %fx=(I.STA.f(Y(1)+0.0001)-I.STA.f(Y(1+0.0001)))/0.0002;
                     %fn=sqrt(1+fx^2);
                     %n=[-fx/fn,1/fn];
                     %miu=I.STA.miu;
                     %SIN=
-                    dy=[Y(3),Y(4),0,-10];
+                    dy=[Y(3),Y(4),I.STA.miu*sign(-I.vx)*FNM/Fn+FN(1),I.STA.miu*sign(-I.vx)*FNM*Fx/Fn-10+FN(2)];
+                    return
                 else
+                    %I.flag==1&&VN
                     dy=[Y(3),Y(4),0,-10];
                 end
             end
