@@ -30,7 +30,7 @@ classdef Particle
             NEW.O=Orbit(15,RGB);
             NEW.STA=STA;
             NEW.flag=0;
-            if nargin>6
+            if nargin>7
                 NEW.ROP=ROP;
                 NEW.ropenum=ropenum;
                 NEW.ropeflag=0;
@@ -40,29 +40,28 @@ classdef Particle
         
         function I=Move(I,dt)                %运动函数（I为质点变量dt为时间步长）N为运动次数
             Y=[I.x,I.y,I.vx,I.vy];
-            
-            
-            
+            if ~isempty(I.ROP)&&I.ropeflag==0
+                I.ROP.Vc(1,I.ropenum)=I.vx*I.m/sum(I.ROP.M);
+                I.ROP.Vc(2,I.ropenum)=I.vy*I.m/sum(I.ROP.M);
+            end
             if ~isempty(I.ROP)&&I.ropeflag==0&&(I.ROP.X(1)-I.ROP.X(2))^2+...
-                    (I.ROP.Y(1)-I.ROP.Y(2))^2>(I.ROP.l)^2           %绳的反弹
+                    (I.ROP.Y(1)-I.ROP.Y(2))^2>(I.ROP.l)^2                       %绳的反弹
+                %vx=I.vx
+                %vy=I.vy
+                %vc=[I.ROP.Vc(1,1)+I.ROP.Vc(1,2),I.ROP.Vc(2,1)+I.ROP.Vc(2,2)]
                 r=[I.ROP.X(3-I.ropenum)-I.ROP.X(I.ropenum),I.ROP.Y(3-I.ropenum)-I.ROP.Y(I.ropenum)];
                 r=[r(1)/sqrt(r(1)^2+r(2)^2),r(2)/sqrt(r(1)^2+r(2)^2)];
                 f=[-r(2),r(1)];
-                V=[I.vx-I.ROP.Vc(1),I.vy-I.ROP.Vc(2)];
+                V=[I.vx-I.ROP.Vc(1,1)-I.ROP.Vc(1,2),I.vy-I.ROP.Vc(2,1)-I.ROP.Vc(2,2)];
                 V=-I.ROP.T*sum(V.*r)*r+sum(V.*f)*f;
-                I.vx=V(1)+I.ROP.Vc(1);
-                I.vy=V(2)+I.ROP.Vc(2);
+                I.vx=V(1)+I.ROP.Vc(1,1)+I.ROP.Vc(1,2);
+                I.vy=V(2)+I.ROP.Vc(2,1)+I.ROP.Vc(2,2);
                 I.ropeflag=(I.ROP.X(1)-I.ROP.X(2))^2+(I.ROP.Y(1)-I.ROP.Y(2))^2>(I.ROP.l)^2;
                 return;
             end
-            if ~isempty(I.ROP)&&I.ropeflag==0
-                if I.ropenum==1
-                    I.ROP.Vc=zeros(2,1);
-                end
-                I.ROP.Vc(1)=I.ROP.Vc(1)+I.vx*I.ROP.M(I.ropenum)/sum(I.ROP.M);
-                I.ROP.Vc(2)=I.ROP.Vc(2)+I.vy*I.ROP.M(I.ropenum)/sum(I.ROP.M);
-            end
+            
             I.ropeflag=(I.ROP.X(1)-I.ROP.X(2))^2+(I.ROP.Y(1)-I.ROP.Y(2))^2>(I.ROP.l)^2;
+            
             
             if I.STA.f(Y(1))>Y(2)&&I.flag==0               %平面反弹条件
                 fx=(I.STA.f(Y(1)+0.0001)-I.STA.f(Y(1)-0.0001))/0.0002;
@@ -75,24 +74,39 @@ classdef Particle
                 return
             end
             I.flag=I.STA.f(Y(1))>Y(2);
+            if ~isempty(I.ROP)%变绳位置
+                I.ROP.X(I.ropenum)=Y(1);
+                I.ROP.Y(I.ropenum)=Y(2);
+            end
             Y=rkn4(@CreatA,dt,Y);
             I.x=Y(1);I.y=Y(2);I.vx=Y(3);I.vy=Y(4);
-            if ~isempty(I.ROP)
-                I.ROP.X(I.ropenum)=Y(1);%变绳位置
-                I.ROP.Y(I.ropenum)=Y(2);%变绳位置
-            end
+            
             
             
             
             
             function dy=CreatA(Y)               %构造加速度
-                
                 temph=-I.STA.f(Y(1))+Y(2);
                 Fx=(I.STA.f(Y(1)+0.0001)-I.STA.f(Y(1)-0.0001))/0.0002;
                 Fn=sqrt(1+Fx^2);
                 VN=-Y(3)*Fx/Fn+Y(4)/Fn;
-                
-                if  abs(temph)<0.001&&VN<0.05||I.flag==1&&VN<0.05&&~isempty(I.ROP)%支持条件
+                if ~isempty(I.ROP)
+                    lr=[I.ROP.X(3-I.ropenum)-I.ROP.X(I.ropenum),I.ROP.Y(3-I.ropenum)-I.ROP.Y(I.ropenum)];
+                    lr=[lr(1)/sqrt(lr(1)^2+lr(2)^2),lr(2)/sqrt(lr(1)^2+lr(2)^2)];
+                end
+                if ~isempty(I.ROP)&&(I.ropeflag==1||abs(I.vy-I.vx*lr(1)/lr(2))<0.05&&...
+                        I.ROP.l-sqrt((I.ROP.X(1)-I.ROP.X(2))^2-(I.ROP.Y(1)-I.ROP.Y(2))^2)<0.05)
+                    I.vy=-I.vx*lr(1)/lr(2);%消除径向速度
+                    %I.y=I.y+0.05;%消除径向位移
+                    if I.ropenum==1
+                        FLR=(I.vx^2+I.vy^2)/I.ROP.Lc;
+                    else
+                        FLR=(I.vx^2+I.vy^2)/(I.ROP.l-I.ROP.Lc);
+                    end
+                    dy=[Y(3),Y(4),FLR*lr(1)*(I.ropenum==1-0.5)*2,FLR*lr(2)*(I.ropenum==1-0.5)*2-10];
+                    return
+                end
+                if  isempty(I.ROP)&&abs(temph)<0.001&&VN<0.05||I.flag==1&&VN<0.05&&~isempty(I.ROP)%支持条件
                     I.vy=I.vx*Fx;%消除径向速度
                     I.y=I.STA.f(Y(1));%消除径向位移
                     Y(4)=I.vy;
@@ -100,7 +114,6 @@ classdef Particle
                         dy=[0,0,0,0];
                         return;
                     end
-                        
                     f2=(I.STA.f(Y(1)+0.0001)+I.STA.f(Y(1)-0.0001)-2*I.STA.f(Y(1)))/0.0001^2;
                     Fr=f2*(Y(3)^2+Y(4)^2)/Fn^3;
                     FNM=max(10/Fn+Fr,0);
@@ -119,6 +132,9 @@ classdef Particle
                 dy4=f(y);y=y0+dx*(dy1+2*(dy2+dy3)+dy4)/6;
             end
         end
+        
+        
+        
         
         function I=plot(I)                %轨迹绘制函数
             I.O=I.O.In(I.x,I.y);
